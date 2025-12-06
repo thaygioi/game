@@ -116,6 +116,7 @@ export const generateGameCodeStream = async (
       3. **Asset Priority:** **ƯU TIÊN TUYỆT ĐỐI** link nhạc Google Drive được cung cấp. Chỉ dùng \`OscillatorNode\` khi link bị lỗi mạng (Network Error).
       4. **Loop Protection:** Bên trong \`gameLoop()\`, hãy bọc nội dung bằng \`try { ... } catch (e) { console.error(e); }\`. Nếu 1 frame lỗi, game vẫn chạy frame tiếp theo.
       5. **Autoplay Bypass:** Game KHÔNG ĐƯỢC chạy ngay. Phải có màn hình "CLICK TO START" để kích hoạt AudioContext.
+      6. **Mute Button:** BẮT BUỘC phải có nút bật/tắt âm thanh (🔊/🔇) ở góc màn hình.
 
       🎨 **GIAO DIỆN (VISUAL STYLE):**
       - **Phong cách:** Hoạt hình 3D rực rỡ, màu sắc tươi sáng (Vivid Colors).
@@ -161,6 +162,7 @@ export const generateGameCodeStream = async (
             const ctx = canvas.getContext('2d');
             let gameState = 'START'; // START, PLAY, GAMEOVER
             let score = 0;
+            let isMuted = false; // Trạng thái âm thanh
             // ... khai báo các biến khác ở đây ...
 
             // 3. Hệ thống âm thanh (ƯU TIÊN GOOGLE DRIVE MP3)
@@ -174,6 +176,8 @@ export const generateGameCodeStream = async (
             
             // Hàm phát âm thanh an toàn
             function playSound(type) {
+                if (isMuted) return; // Nếu tắt tiếng thì không phát
+
                 try {
                     const s = type === 'bg' ? sounds.bg : (type === 'correct' ? sounds.correct : sounds.wrong);
                     
@@ -187,15 +191,20 @@ export const generateGameCodeStream = async (
                             // Lỗi NotAllowedError (chưa click) thì bỏ qua, chờ user click
                             if (error.name !== 'NotAllowedError') {
                                 console.warn("Audio MP3 failed, using fallback:", error);
-                                if (type === 'correct') playBeep(600, 'square');
-                                else if (type === 'wrong') playBeep(200, 'sawtooth');
+                                if (!isMuted) {
+                                    if (type === 'correct') playBeep(600, 'square');
+                                    else if (type === 'wrong') playBeep(200, 'sawtooth');
+                                }
                             }
                         });
                     }
-                } catch(e) { playBeep(440, 'sine'); }
+                } catch(e) { 
+                    if (!isMuted) playBeep(440, 'sine'); 
+                }
             }
 
             function playBeep(freq, type) {
+                if (isMuted) return;
                 // ... code tạo tiếng bíp dùng AudioContext ...
             }
 
@@ -212,7 +221,15 @@ export const generateGameCodeStream = async (
 
             function draw() {
                 // ... vẽ mọi thứ (dùng EMOJI làm hình ảnh) ...
+                
                 // Vẽ UI (Nút Start, Nút Replay, Điểm số)
+                
+                // VẼ NÚT MUTE (Góc trên phải)
+                ctx.save();
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'right';
+                ctx.fillText(isMuted ? '🔇' : '🔊', canvas.width - 20, 50);
+                ctx.restore();
             }
 
             // 5. Vòng lặp an toàn
@@ -231,7 +248,19 @@ export const generateGameCodeStream = async (
 
             // Input Handling (Mouse & Keyboard)
             window.addEventListener('mousedown', (e) => {
-                // Xử lý click chuột
+                const x = e.clientX;
+                const y = e.clientY;
+
+                // Xử lý Click nút MUTE (Góc trên phải)
+                // Giả sử nút nằm vùng 50x50px góc phải
+                if (x > canvas.width - 60 && x < canvas.width && y < 60) {
+                    isMuted = !isMuted;
+                    if (isMuted) sounds.bg.pause();
+                    else if (gameState === 'PLAY') sounds.bg.play();
+                    return; // Không xử lý các click khác
+                }
+
+                // Xử lý click chuột game
                 if (gameState === 'START') { 
                     gameState = 'PLAY'; 
                     playSound('bg'); // Kích hoạt nhạc nền ngay khi click Start

@@ -1,12 +1,18 @@
-
-import React, { useState } from 'react';
-import { Sparkles, Loader2, Target, PenTool, BarChart3, Volume2 } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Sparkles, Loader2, Target, PenTool, BarChart3, Volume2, FileText, X, Upload } from 'lucide-react';
 import { PromptInputProps } from '../types';
+import { extractTextFromPDF } from '../services/pdfService';
 
 export const PromptInput: React.FC<PromptInputProps> = ({ onGenerate, isGenerating }) => {
   const [idea, setIdea] = useState('');
   const [ageGroup, setAgeGroup] = useState('Tiểu học (6-10 tuổi)');
   const [difficulty, setDifficulty] = useState('Vừa');
+  
+  // PDF State
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfContent, setPdfContent] = useState<string>('');
+  const [isReadingPdf, setIsReadingPdf] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const difficultyLevels = [
     { value: 'Dễ', color: 'bg-kid-green', border: 'border-kid-greenDark', shadow: 'shadow-kid-greenDark' },
@@ -14,10 +20,53 @@ export const PromptInput: React.FC<PromptInputProps> = ({ onGenerate, isGenerati
     { value: 'Khó', color: 'bg-kid-pink', border: 'border-kid-pinkDark', shadow: 'shadow-kid-pinkDark' },
   ];
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        alert('Vui lòng chỉ chọn file PDF!');
+        return;
+      }
+      
+      setPdfFile(file);
+      setIsReadingPdf(true);
+      
+      try {
+        const text = await extractTextFromPDF(file);
+        setPdfContent(text);
+      } catch (error) {
+        alert('Lỗi khi đọc file PDF: ' + (error as Error).message);
+        setPdfFile(null);
+        setPdfContent('');
+      } finally {
+        setIsReadingPdf(false);
+      }
+    }
+  };
+
+  const removePdf = () => {
+    setPdfFile(null);
+    setPdfContent('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (idea.trim()) {
-      onGenerate(idea, ageGroup, difficulty);
+    if (idea.trim() || pdfContent) {
+      // Gộp nội dung PDF vào Prompt nếu có
+      let finalIdea = idea;
+      if (pdfContent) {
+        finalIdea += `\n\n[DỮ LIỆU CÂU HỎI TỪ FILE PDF NGƯỜI DÙNG]:\n${pdfContent}\n\n[YÊU CẦU]: Hãy sử dụng dữ liệu câu hỏi trong file PDF trên để tạo nội dung trò chơi.`;
+      }
+      
+      // Nếu người dùng không nhập ý tưởng nhưng có file PDF, tự động điền ý tưởng mặc định
+      if (!finalIdea.trim() && pdfContent) {
+          finalIdea = "Tạo một trò chơi trắc nghiệm dựa trên nội dung file PDF đính kèm.";
+      }
+
+      onGenerate(finalIdea, ageGroup, difficulty);
     }
   };
 
@@ -82,10 +131,58 @@ export const PromptInput: React.FC<PromptInputProps> = ({ onGenerate, isGenerati
           id="idea"
           value={idea}
           onChange={(e) => setIdea(e.target.value)}
-          placeholder="Ví dụ: Game tính nhẩm nhanh, trả lời đúng thì phi thuyền bay lên cao. Giao diện vũ trụ màu tối, có sao lấp lánh..."
-          className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm min-h-[140px] font-medium text-slate-700 focus:outline-none focus:ring-4 focus:ring-kid-pink/20 focus:border-kid-pink transition-all resize-none placeholder:text-slate-400 placeholder:font-normal"
-          required
+          placeholder="Ví dụ: Game tính nhẩm nhanh... Hoặc tải file PDF câu hỏi lên để AI tự tạo game từ đó!"
+          className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm min-h-[100px] font-medium text-slate-700 focus:outline-none focus:ring-4 focus:ring-kid-pink/20 focus:border-kid-pink transition-all resize-none placeholder:text-slate-400 placeholder:font-normal"
         />
+      </div>
+
+      {/* PDF Upload Section */}
+      <div className="space-y-2">
+        <input 
+            type="file" 
+            ref={fileInputRef}
+            accept=".pdf" 
+            onChange={handleFileChange}
+            className="hidden" 
+        />
+        
+        {!pdfFile ? (
+            <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-3 px-4 border-2 border-dashed border-orange-300 bg-orange-50 hover:bg-orange-100 rounded-2xl flex items-center justify-center gap-2 text-orange-600 font-bold transition-all group"
+            >
+                <div className="bg-orange-200 p-1.5 rounded-lg group-hover:scale-110 transition-transform">
+                    <FileText className="w-5 h-5 text-orange-600" />
+                </div>
+                <span>Tải lên PDF bộ câu hỏi</span>
+            </button>
+        ) : (
+            <div className="w-full py-3 px-4 bg-orange-100 border-2 border-orange-300 rounded-2xl flex items-center justify-between animate-in fade-in zoom-in-95">
+                <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="bg-white p-2 rounded-xl shadow-sm">
+                        {isReadingPdf ? (
+                            <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
+                        ) : (
+                            <FileText className="w-5 h-5 text-orange-600" />
+                        )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-slate-700 truncate">{pdfFile.name}</span>
+                        <span className="text-xs text-orange-600 font-medium">
+                            {isReadingPdf ? 'Đang đọc nội dung...' : 'Đã sẵn sàng!'}
+                        </span>
+                    </div>
+                </div>
+                <button 
+                    type="button"
+                    onClick={removePdf}
+                    className="p-1.5 hover:bg-white/50 rounded-full text-slate-500 hover:text-red-500 transition-colors"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+        )}
       </div>
 
       {/* Audio Indicator */}
@@ -96,9 +193,9 @@ export const PromptInput: React.FC<PromptInputProps> = ({ onGenerate, isGenerati
 
       <button
         type="submit"
-        disabled={isGenerating || !idea.trim()}
+        disabled={isGenerating || (!idea.trim() && !pdfContent) || isReadingPdf}
         className={`w-full group relative flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-black text-white text-lg transition-all transform 
-          ${isGenerating || !idea.trim() 
+          ${isGenerating || (!idea.trim() && !pdfContent) || isReadingPdf
             ? 'bg-slate-300 cursor-not-allowed shadow-none translate-y-0' 
             : 'bg-gradient-to-r from-kid-pink to-kid-pinkDark shadow-[0_6px_0_#9D174D] hover:shadow-[0_4px_0_#9D174D] hover:translate-y-[2px] active:shadow-none active:translate-y-[6px]'
           }`}
