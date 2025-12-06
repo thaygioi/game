@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Gamepad2, Wand2, Rocket, Star, Heart, Settings } from 'lucide-react';
+import { Gamepad2, Wand2, Rocket, Star, Heart, Settings, Users } from 'lucide-react';
 import { PromptInput } from './components/PromptInput';
 import { GameDisplay } from './components/GameDisplay';
 import { ChatBot } from './components/ChatBot';
@@ -124,10 +124,23 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2">
-             <div className="hidden md:flex px-4 py-2 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold border-2 border-yellow-200 shadow-sm items-center gap-1">
+             {/* Zalo Community Button - PROMINENT */}
+             <a
+                href="https://zalo.me/g/zickyw266"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 sm:px-5 py-2 bg-[#0068FF] hover:bg-[#0054cc] text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 mr-1 border-b-4 border-[#0041a3] active:border-b-0 active:translate-y-1"
+                title="Tham gia nhóm Zalo"
+             >
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Cộng đồng & Hướng dẫn</span>
+                <span className="sm:hidden">Cộng đồng</span>
+             </a>
+
+             <div className="hidden lg:flex px-4 py-2 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold border-2 border-yellow-200 shadow-sm items-center gap-1">
                 <Star className="w-3 h-3 fill-current" /> Thầy Giới
              </div>
-             <div className="hidden sm:flex px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-xs font-bold border-2 border-purple-200 shadow-sm items-center gap-1">
+             <div className="hidden xl:flex px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-xs font-bold border-2 border-purple-200 shadow-sm items-center gap-1">
                 <Rocket className="w-3 h-3 fill-current" /> Bal Digitech
              </div>
              
