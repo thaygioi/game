@@ -1,84 +1,44 @@
+
 import { GoogleGenAI } from "@google/genai";
-import { ChatMessage } from "../types";
+import { ChatMessage, CustomAudioAssets } from "../types";
 
 const getClient = (userApiKey?: string) => {
-    // 1. Xác định nguồn Key (User Input hoặc Env)
     let rawKey = userApiKey || process.env.API_KEY;
-
-    if (!rawKey) {
-      throw new Error("Chưa có API Key! Vui lòng nhấn vào nút Cài đặt (⚙️) ở góc trên màn hình để nhập Google Gemini API Key.");
-    }
-
+    if (!rawKey) throw new Error("Chưa có API Key! Vui lòng nhấn vào nút Cài đặt (⚙️) ở góc trên màn hình để nhập Google Gemini API Key.");
     let finalKey = rawKey;
-
-    // 2. Xử lý Multi-Key (Nếu là chuỗi JSON array)
     try {
         if (rawKey.trim().startsWith('[') && rawKey.trim().endsWith(']')) {
             const parsedKeys = JSON.parse(rawKey);
             if (Array.isArray(parsedKeys) && parsedKeys.length > 0) {
-                // Lọc key rỗng
                 const validKeys = parsedKeys.filter(k => k && typeof k === 'string' && k.trim().length > 0);
-                if (validKeys.length > 0) {
-                    // Chọn ngẫu nhiên 1 key
-                    finalKey = validKeys[Math.floor(Math.random() * validKeys.length)];
-                }
+                if (validKeys.length > 0) finalKey = validKeys[Math.floor(Math.random() * validKeys.length)];
             }
         }
-    } catch (e) {
-        // Nếu lỗi parse JSON, coi như là string key bình thường
-        console.warn("API Key không phải dạng mảng JSON, sử dụng như Single Key.");
-    }
-
+    } catch (e) { console.warn("API Key không phải dạng mảng JSON, sử dụng như Single Key."); }
     return new GoogleGenAI({ apiKey: finalKey });
 };
 
 // Fixed Audio Assets (Google Drive Direct Links)
-const AUDIO_ASSETS = {
+const DEFAULT_AUDIO = {
   WRONG: "https://drive.google.com/uc?export=download&id=18dwx0EDlzbYDds0PupqxmR03ux_QH4zn",
   CORRECT: "https://drive.google.com/uc?export=download&id=1wxYH5-gSbJwFxBHy-oXfT2w64cJLa5Vl",
-  BG_MUSIC: "https://drive.google.com/uc?export=download&id=1j0NFTSkaWtntRRbrExcAkx3_we07ZusE"
+  BG: "https://drive.google.com/uc?export=download&id=1j0NFTSkaWtntRRbrExcAkx3_we07ZusE"
 };
 
 const cleanGeneratedCode = (rawText: string): string => {
   let cleanText = rawText.replace(/<!-- 🚀.*?-->/gs, '');
-
   const markdownMatch = cleanText.match(/```html([\s\S]*?)```/);
-  if (markdownMatch && markdownMatch[1]) {
-      cleanText = markdownMatch[1];
-  }
-
+  if (markdownMatch && markdownMatch[1]) cleanText = markdownMatch[1];
   const htmlStart = cleanText.indexOf('<!DOCTYPE html>');
   const htmlEnd = cleanText.lastIndexOf('</html>');
-
-  if (htmlStart !== -1 && htmlEnd !== -1) {
-      cleanText = cleanText.substring(htmlStart, htmlEnd + 7);
-  } else if (htmlStart !== -1) {
-       // Nếu AI quên đóng thẻ html, tự động đóng giúp
-       cleanText = cleanText.substring(htmlStart) + '</html>';
-  }
-
+  if (htmlStart !== -1 && htmlEnd !== -1) cleanText = cleanText.substring(htmlStart, htmlEnd + 7);
+  else if (htmlStart !== -1) cleanText = cleanText.substring(htmlStart) + '</html>';
   return cleanText.trim();
 };
 
-export const consultGameLogic = async (
-    idea: string,
-    ageGroup: string,
-    apiKey: string | undefined
-): Promise<string> => {
+export const consultGameLogic = async (idea: string, ageGroup: string, apiKey: string | undefined): Promise<string> => {
     const ai = getClient(apiKey);
-    
-    const prompt = `
-        Bạn là GAME DESIGNER chuyên nghiệp.
-        Ý tưởng người dùng: "${idea}" (Tuổi: ${ageGroup}).
-        
-        Nhiệm vụ: Hãy đặt **MỘT CÂU HỎI DUY NHẤT** để làm rõ cơ chế game (Gameplay) hoặc Phong cách (Visual).
-        Mục tiêu: Giúp game sau này lập trình chính xác hơn.
-        
-        Ví dụ: "Bạn muốn game dạng trắc nghiệm chọn đáp án hay dạng hành động né chướng ngại vật?"
-        
-        Chỉ trả về câu hỏi.
-    `;
-
+    const prompt = `Bạn là GAME DESIGNER chuyên nghiệp. Ý tưởng: "${idea}" (Tuổi: ${ageGroup}). Hãy đặt **MỘT CÂU HỎI DUY NHẤT** để làm rõ cơ chế game. Chỉ trả về câu hỏi.`;
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -86,9 +46,7 @@ export const consultGameLogic = async (
             config: { temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } }
         });
         return response.text || "Bạn muốn cách chơi cụ thể như thế nào?";
-    } catch (error) {
-        return "Bạn muốn game này chơi như thế nào?";
-    }
+    } catch (error) { return "Bạn muốn game này chơi như thế nào?"; }
 };
 
 export const generateGameCodeStream = async (
@@ -96,224 +54,115 @@ export const generateGameCodeStream = async (
   ageGroup: string,
   difficulty: string,
   userClarification: string, 
+  customAudio: CustomAudioAssets,
   apiKey: string | undefined,
   onUpdate: (chunkText: string) => void
 ): Promise<string> => {
-  // Fake log để kích hoạt UI ngay lập tức
-  let fullText = '<!-- 🚀 Đang khởi tạo Engine Game HTML5 Canvas (Fail-safe Mode)... -->\n';
+  let fullText = '<!-- 🚀 Đang khởi tạo Engine Game HTML5 Canvas (Custom Audio Enabled)... -->\n';
   onUpdate(fullText);
+
+  // Xác định nguồn âm thanh (Placeholder nếu có Custom, hoặc Default Link)
+  // Lưu ý: AI sẽ được yêu cầu điền PLACEHOLDER, sau đó ta sẽ replace bằng Base64 thật ở cuối
+  const bgSrc = customAudio.bgMusic ? "__CUSTOM_BG_MUSIC_TOKEN__" : DEFAULT_AUDIO.BG;
+  const correctSrc = customAudio.correctSound ? "__CUSTOM_CORRECT_TOKEN__" : DEFAULT_AUDIO.CORRECT;
+  const wrongSrc = customAudio.wrongSound ? "__CUSTOM_WRONG_TOKEN__" : DEFAULT_AUDIO.WRONG;
 
   try {
     const ai = getClient(apiKey);
-    
     const prompt = `
       Bạn là MỘT ENGINE TẠO GAME TỰ ĐỘNG (AI Game Generator).
-      NHIỆM VỤ TỐI THƯỢNG: Trả về code HTML5 Single-file CHẠY ĐƯỢC 100% (Runnable). KHÔNG ĐƯỢC PHÉP LỖI CÚ PHÁP.
+      NHIỆM VỤ: Trả về code HTML5 Single-file CHẠY ĐƯỢC 100%.
 
-      🚨 **BỘ LUẬT AN TOÀN TUYỆT ĐỐI (FAIL-SAFE PROTOCOLS):**
-      1. **Error Handling:** Bắt buộc chèn script \`window.onerror\` ở ngay đầu thẻ \`<body>\` để hứng mọi lỗi và hiện lên màn hình.
-      2. **Variable Safety:** Khai báo TOÀN BỘ biến toàn cục (canvas, ctx, score, state...) ở ngay dòng đầu tiên của thẻ \`<script>\`. Không dùng biến trước khi khai báo.
-      3. **Asset Priority:** **ƯU TIÊN TUYỆT ĐỐI** link nhạc Google Drive được cung cấp. Chỉ dùng \`OscillatorNode\` khi link bị lỗi mạng (Network Error).
-      4. **Loop Protection:** Bên trong \`gameLoop()\`, hãy bọc nội dung bằng \`try { ... } catch (e) { console.error(e); }\`. Nếu 1 frame lỗi, game vẫn chạy frame tiếp theo.
-      5. **Autoplay Bypass:** Game KHÔNG ĐƯỢC chạy ngay. Phải có màn hình "CLICK TO START" để kích hoạt AudioContext.
-      6. **Mute Button:** BẮT BUỘC phải có nút bật/tắt âm thanh (🔊/🔇) ở góc màn hình.
+      🚨 **FAIL-SAFE PROTOCOLS:**
+      1. **Error Handling:** Chèn script \`window.onerror\` đầu thẻ body.
+      2. **Variable Safety:** Khai báo toàn bộ biến đầu script.
+      3. **Asset Priority:** Sử dụng link âm thanh được cung cấp dưới đây. Nếu là token __CUSTOM...__ thì cứ điền y nguyên vào src.
+      4. **Loop Protection:** Try-catch trong gameLoop.
+      5. **Autoplay Bypass:** Cần màn hình CLICK TO START.
+      6. **Mute Button:** Có nút bật/tắt âm thanh.
 
-      🎨 **GIAO DIỆN (VISUAL STYLE):**
-      - **Phong cách:** Hoạt hình 3D rực rỡ, màu sắc tươi sáng (Vivid Colors).
-      - **Assets:** Sử dụng **EMOJI** (🤡, 🚗, 🍎, 🚀) vẽ lên Canvas thay vì tải ảnh ngoài (để tránh lỗi 404).
-      - **UI:** Nút bấm phải RẤT TO, bo tròn, có đổ bóng 3D. Font chữ to, đậm, vui nhộn.
-      - **Responsive:** Canvas luôn full màn hình (\`width: 100%; height: 100%\`), tự resize khi xoay máy.
+      🎨 **VISUAL STYLE:** Hoạt hình 3D rực rỡ, EMOJI làm sprite, Nút bấm to. Canvas full màn hình.
 
-      🎮 **THÔNG TIN GAME:**
-      - **Ý tưởng:** "${idea}"
-      - **Chi tiết thêm:** "${userClarification}"
-      - **Độ tuổi:** ${ageGroup}.
-      - **Độ khó:** ${difficulty}.
-      - **Điều khiển:** CHỈ HỖ TRỢ CHUỘT (Click) và BÀN PHÍM.
+      🎮 **GAME INFO:**
+      - Ý tưởng: "${idea}"
+      - Chi tiết: "${userClarification}"
+      - Tuổi: ${ageGroup}. Độ khó: ${difficulty}.
+      - Điều khiển: Chuột & Phím.
 
-      🔗 **ÂM THANH CỐ ĐỊNH (NGUỒN CHÍNH - BẮT BUỘC DÙNG):**
-      - Nhạc nền (ƯU TIÊN CAO NHẤT): "${AUDIO_ASSETS.BG_MUSIC}"
-      - Đúng (ƯU TIÊN CAO NHẤT): "${AUDIO_ASSETS.CORRECT}"
-      - Sai (ƯU TIÊN CAO NHẤT): "${AUDIO_ASSETS.WRONG}"
+      🔗 **ÂM THANH (Sử dụng chính xác các link này):**
+      - Nhạc nền: "${bgSrc}"
+      - Đúng: "${correctSrc}"
+      - Sai: "${wrongSrc}"
 
-      🛠️ **CẤU TRÚC CODE BẮT BUỘC (TEMPLATE):**
+      🛠️ **CẤU TRÚC CODE (TEMPLATE):**
       \`\`\`html
       <!DOCTYPE html>
       <html>
-      <head>
-        <style>body { margin: 0; overflow: hidden; background: #333; font-family: sans-serif; }</style>
-      </head>
+      <head><style>body{margin:0;overflow:hidden;background:#333}</style></head>
       <body>
-        <!-- 1. Bẫy lỗi -->
-        <script>
-            window.onerror = function(msg, url, line) {
-                const d = document.createElement('div');
-                d.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:red;color:white;padding:10px;z-index:9999;';
-                d.innerHTML = '⚠️ Lỗi Game: ' + msg + ' (Dòng ' + line + ')';
-                document.body.appendChild(d);
-            };
-        </script>
-
+        <script>window.onerror=function(m,u,l){document.body.innerHTML+='<div style="position:fixed;top:0;background:red;color:white;z-index:9999">⚠️ '+m+'</div>'}</script>
         <canvas id="gameCanvas"></canvas>
-
         <script>
-            // 2. Khai báo biến toàn cục
+            // Biến toàn cục
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
-            let gameState = 'START'; // START, PLAY, GAMEOVER
-            let score = 0;
-            let isMuted = false; // Trạng thái âm thanh
-            // ... khai báo các biến khác ở đây ...
-
-            // 3. Hệ thống âm thanh (ƯU TIÊN GOOGLE DRIVE MP3)
+            let gameState = 'START';
+            let isMuted = false;
+            
+            // Âm thanh
             const sounds = {
-                bg: new Audio('${AUDIO_ASSETS.BG_MUSIC}'),
-                correct: new Audio('${AUDIO_ASSETS.CORRECT}'),
-                wrong: new Audio('${AUDIO_ASSETS.WRONG}')
+                bg: new Audio('${bgSrc}'),
+                correct: new Audio('${correctSrc}'),
+                wrong: new Audio('${wrongSrc}')
             };
-            sounds.bg.loop = true;
-            sounds.bg.volume = 0.6; // Âm lượng vừa phải
-            
-            // Hàm phát âm thanh an toàn
-            function playSound(type) {
-                if (isMuted) return; // Nếu tắt tiếng thì không phát
+            sounds.bg.loop = true; sounds.bg.volume = 0.6;
 
+            function playSound(t) {
+                if(isMuted) return;
                 try {
-                    const s = type === 'bg' ? sounds.bg : (type === 'correct' ? sounds.correct : sounds.wrong);
-                    
-                    if (type !== 'bg') s.currentTime = 0;
-                    
-                    const playPromise = s.play();
-                    
-                    if (playPromise !== undefined) {
-                        playPromise.catch(error => {
-                            // Chỉ khi lỗi mạng thật sự mới fallback sang Beep
-                            // Lỗi NotAllowedError (chưa click) thì bỏ qua, chờ user click
-                            if (error.name !== 'NotAllowedError') {
-                                console.warn("Audio MP3 failed, using fallback:", error);
-                                if (!isMuted) {
-                                    if (type === 'correct') playBeep(600, 'square');
-                                    else if (type === 'wrong') playBeep(200, 'sawtooth');
-                                }
-                            }
-                        });
-                    }
-                } catch(e) { 
-                    if (!isMuted) playBeep(440, 'sine'); 
-                }
+                    const s = t==='bg'?sounds.bg:(t==='correct'?sounds.correct:sounds.wrong);
+                    if(t!=='bg') s.currentTime=0;
+                    s.play().catch(e=>console.log(e));
+                } catch(e){}
             }
 
-            function playBeep(freq, type) {
-                if (isMuted) return;
-                // ... code tạo tiếng bíp dùng AudioContext ...
-            }
-
-            // 4. Logic Game
-            function init() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-                // ... khởi tạo đối tượng game ...
-            }
-
-            function update() {
-                // ... cập nhật logic (di chuyển, va chạm) ...
-            }
-
-            function draw() {
-                // ... vẽ mọi thứ (dùng EMOJI làm hình ảnh) ...
-                
-                // Vẽ UI (Nút Start, Nút Replay, Điểm số)
-                
-                // VẼ NÚT MUTE (Góc trên phải)
-                ctx.save();
-                ctx.font = '30px Arial';
-                ctx.textAlign = 'right';
-                ctx.fillText(isMuted ? '🔇' : '🔊', canvas.width - 20, 50);
-                ctx.restore();
-            }
-
-            // 5. Vòng lặp an toàn
-            function loop() {
-                try {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    if (gameState === 'PLAY') {
-                        update();
-                    }
-                    draw();
-                } catch (e) {
-                    console.error("Frame Error:", e);
-                }
+            // Logic Game
+            function init(){ canvas.width=innerWidth; canvas.height=innerHeight; }
+            function loop(){ 
                 requestAnimationFrame(loop);
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                // Vẽ UI, Game Logic...
+                // VẼ NÚT MUTE, REPLAY, START...
             }
-
-            // Input Handling (Mouse & Keyboard)
-            window.addEventListener('mousedown', (e) => {
-                const x = e.clientX;
-                const y = e.clientY;
-
-                // Xử lý Click nút MUTE (Góc trên phải)
-                // Giả sử nút nằm vùng 50x50px góc phải
-                if (x > canvas.width - 60 && x < canvas.width && y < 60) {
-                    isMuted = !isMuted;
-                    if (isMuted) sounds.bg.pause();
-                    else if (gameState === 'PLAY') sounds.bg.play();
-                    return; // Không xử lý các click khác
-                }
-
-                // Xử lý click chuột game
-                if (gameState === 'START') { 
-                    gameState = 'PLAY'; 
-                    playSound('bg'); // Kích hoạt nhạc nền ngay khi click Start
-                    init(); 
-                }
-                else if (gameState === 'GAMEOVER') { gameState = 'START'; }
-                else { 
-                    // Logic chơi game
-                }
-            });
             
-            window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
-
-            // Bắt đầu
-            init();
-            loop();
+            window.addEventListener('mousedown', (e) => { /* Xử lý click */ });
+            init(); loop();
         </script>
-      </body>
-      </html>
+      </body></html>
       \`\`\`
-
-      HÃY VIẾT CODE DỰA TRÊN TEMPLATE TRÊN. CHỈ TRẢ VỀ CODE HTML.
     `;
 
-    const apiCallPromise = ai.models.generateContentStream({
+    const responseStream = await ai.models.generateContentStream({
       model: 'gemini-2.5-flash',
       contents: prompt,
-      config: {
-        temperature: 0.6, // Giảm sáng tạo để tăng độ ổn định logic
-        maxOutputTokens: 8192,
-        thinkingConfig: { thinkingBudget: 0 } 
-      }
+      config: { temperature: 0.6, thinkingConfig: { thinkingBudget: 0 } }
     });
 
-    // Timeout an toàn 90s
-    const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error("AI đang tính toán logic phức tạp, vui lòng đợi thêm...")), 90000)
-    );
-
-    const responseStream = await Promise.race([apiCallPromise, timeoutPromise]);
-
-    let isFirstChunk = true;
     for await (const chunk of responseStream) {
       const chunkText = chunk.text || '';
-      if (isFirstChunk) {
-         if (fullText.includes('<!-- 🚀')) fullText = ''; 
-         isFirstChunk = false;
-      }
       fullText += chunkText;
-      onUpdate(fullText);
+      onUpdate(fullText); // Stream code thô (chứa token placeholder) cho preview
     }
 
-    return cleanGeneratedCode(fullText);
+    let finalCode = cleanGeneratedCode(fullText);
+
+    // POST-PROCESSING: Thay thế Token bằng Base64 thật
+    // Bước này làm cho file HTML cuối cùng chứa toàn bộ dữ liệu âm thanh
+    if (customAudio.bgMusic) finalCode = finalCode.replace('__CUSTOM_BG_MUSIC_TOKEN__', customAudio.bgMusic);
+    if (customAudio.correctSound) finalCode = finalCode.replace('__CUSTOM_CORRECT_TOKEN__', customAudio.correctSound);
+    if (customAudio.wrongSound) finalCode = finalCode.replace('__CUSTOM_WRONG_TOKEN__', customAudio.wrongSound);
+
+    return finalCode;
 
   } catch (error) {
     console.error("Gemini Service Error:", error);
@@ -328,43 +177,11 @@ export const sendChatMessage = async (
     apiKey: string | undefined
 ): Promise<{ text: string, newCode?: string }> => {
     const ai = getClient(apiKey);
-    
-    if (!currentCode) {
-         return { text: "Hãy tạo một trò chơi trước, sau đó tôi sẽ giúp bạn sửa lỗi hoặc thêm tính năng!" };
-    }
-    
-    const prompt = `
-        MÃ NGUỒN HTML HIỆN TẠI:
-        \`\`\`html
-        ${currentCode}
-        \`\`\`
-        YÊU CẦU NGƯỜI DÙNG: "${userMessage}"
-        
-        NHIỆM VỤ: Sửa code HTML trên để đáp ứng yêu cầu.
-        QUY TẮC AN TOÀN:
-        - KHÔNG xóa phần window.onerror.
-        - KHÔNG xóa phần fallback âm thanh (playBeep).
-        - Đảm bảo cú pháp đóng mở thẻ chính xác.
-        - Trả về toàn bộ code HTML đã sửa.
-    `;
-
+    const prompt = `CODE HTML: \`\`\`html\n${currentCode}\n\`\`\`\nYÊU CẦU: "${userMessage}". Hãy sửa code. Giữ nguyên các link âm thanh Base64 nếu có.`;
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: { thinkingConfig: { thinkingBudget: 0 } }
-        });
-
-        const rawText = response.text || "";
-        const newCode = cleanGeneratedCode(rawText);
-
-        if (newCode && newCode.startsWith('<!DOCTYPE html>')) {
-            return { text: 'Đã cập nhật code theo yêu cầu của bạn! Hãy nhấn "Chơi Luôn" để thử nhé.', newCode: newCode };
-        } else {
-            return { text: rawText };
-        }
-
-    } catch (error) {
-        return { text: "Xin lỗi, tôi gặp chút trục trặc khi sửa code. Bạn thử lại nhé." };
-    }
+        const res = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { thinkingConfig: { thinkingBudget: 0 } } });
+        const raw = res.text || "";
+        const newCode = cleanGeneratedCode(raw);
+        return { text: newCode.startsWith('<!DOCTYPE') ? 'Đã sửa code!' : raw, newCode: newCode.startsWith('<!DOCTYPE') ? newCode : undefined };
+    } catch (e) { return { text: "Lỗi khi sửa code." }; }
 }

@@ -6,7 +6,7 @@ import { GameDisplay } from './components/GameDisplay';
 import { ChatBot } from './components/ChatBot';
 import { SettingsModal } from './components/SettingsModal';
 import { generateGameCodeStream, consultGameLogic } from './services/geminiService';
-import { GameGenerationState, PendingGameRequest } from './types';
+import { GameGenerationState, PendingGameRequest, CustomAudioAssets } from './types';
 
 const App: React.FC = () => {
   const [generationState, setGenerationState] = useState<GameGenerationState>({
@@ -19,9 +19,9 @@ const App: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
-  // Logic Consultation (The "Logical Thinking" Flow)
+  // Logic Consultation
   const [proactiveMessage, setProactiveMessage] = useState<string | null>(null);
-  const [pendingRequest, setPendingRequest] = useState<PendingGameRequest | null>(null);
+  const [pendingRequest, setPendingRequest] = useState<PendingGameRequest & { customAudio: CustomAudioAssets } | null>(null);
 
   useEffect(() => {
     const savedKey = localStorage.getItem('GEMINI_API_KEY');
@@ -34,39 +34,44 @@ const App: React.FC = () => {
     setIsSettingsOpen(false);
   };
 
-  // Step 1: User submits idea -> System triggers Consultation
-  const handleInitialRequest = async (idea: string, ageGroup: string, difficulty: string) => {
-    // Save the request for later
-    setPendingRequest({ idea, ageGroup, difficulty });
+  // Step 1: User submits idea
+  const handleInitialRequest = async (idea: string, ageGroup: string, difficulty: string, customAudio: CustomAudioAssets) => {
+    setPendingRequest({ idea, ageGroup, difficulty, customAudio });
     setGenerationState({ status: 'loading', code: '', error: undefined });
     setProactiveMessage(null);
 
     try {
-        // AI Architect thinks of a question
         const consultationQuestion = await consultGameLogic(idea, ageGroup, apiKey);
-        
-        // Switch to Consulting Mode
         setGenerationState({ status: 'consulting', code: '', error: undefined });
-        setProactiveMessage(consultationQuestion); // Trigger ChatBot to open
-        
+        setProactiveMessage(consultationQuestion);
     } catch (error) {
-        // Failover: Just generate the game if consultation fails
-        handleStartGeneration(idea, ageGroup, difficulty, "Hãy tự quyết định logic game phù hợp nhất.");
+        handleStartGeneration(idea, ageGroup, difficulty, "Hãy tự quyết định logic game phù hợp nhất.", customAudio);
     }
   };
 
-  // Step 2: User answers the question -> System starts Coding
+  // Step 2: User answers
   const handleConsultationReply = (userReply: string) => {
       if (pendingRequest) {
-          handleStartGeneration(pendingRequest.idea, pendingRequest.ageGroup, pendingRequest.difficulty, userReply);
-          // Clear pending state
+          handleStartGeneration(
+              pendingRequest.idea, 
+              pendingRequest.ageGroup, 
+              pendingRequest.difficulty, 
+              userReply,
+              pendingRequest.customAudio
+          );
           setProactiveMessage(null);
           setPendingRequest(null);
       }
   };
 
-  // Step 3: Core Generation Logic
-  const handleStartGeneration = async (idea: string, ageGroup: string, difficulty: string, userClarification: string) => {
+  // Step 3: Core Generation
+  const handleStartGeneration = async (
+      idea: string, 
+      ageGroup: string, 
+      difficulty: string, 
+      userClarification: string,
+      customAudio: CustomAudioAssets
+  ) => {
     setGenerationState({ status: 'loading', code: '', error: undefined });
     
     try {
@@ -74,7 +79,8 @@ const App: React.FC = () => {
         idea, 
         ageGroup, 
         difficulty, 
-        userClarification, // Pass the user's answer to the coder AI
+        userClarification, 
+        customAudio,
         apiKey, 
         (partialCode) => {
           setGenerationState(prev => ({
@@ -124,7 +130,6 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2">
-             {/* Zalo Community Button - PROMINENT */}
              <a
                 href="https://zalo.me/g/zickyw266"
                 target="_blank"
@@ -144,7 +149,6 @@ const App: React.FC = () => {
                 <Rocket className="w-3 h-3 fill-current" /> Bal Digitech
              </div>
              
-             {/* Settings Button */}
              <button 
                 onClick={() => setIsSettingsOpen(true)}
                 className={`p-2.5 rounded-xl border-2 transition-all ${apiKey ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-red-100 text-red-500 border-red-200 animate-pulse'}`}
@@ -156,11 +160,9 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content - Full Width Expansion */}
+      {/* Main Content */}
       <main className="flex-1 max-w-[1920px] w-full mx-auto px-4 py-6 pb-32">
         <div className="flex flex-col lg:flex-row gap-6 h-full">
-          
-          {/* Left Column: Input - Fixed width on large screens */}
           <div className="w-full lg:w-[380px] xl:w-[420px] flex-shrink-0 space-y-6">
             <div className="bg-white rounded-3xl shadow-[0_8px_0_rgba(0,0,0,0.05)] border-2 border-slate-100 p-6 relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-20 h-20 bg-kid-yellow/20 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
@@ -183,14 +185,12 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Display - Flex Grow to take remaining space */}
           <div className="flex-1 h-full min-h-[600px] flex flex-col">
             <GameDisplay state={generationState} />
           </div>
         </div>
       </main>
 
-      {/* Chat Bot with Proactive Trigger and Consultation Mode */}
       <ChatBot 
         currentCode={generationState.code} 
         onCodeUpdate={handleCodeUpdate}
@@ -201,7 +201,6 @@ const App: React.FC = () => {
         isConsulting={generationState.status === 'consulting'}
       />
 
-      {/* Settings Modal */}
       <SettingsModal 
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -209,20 +208,17 @@ const App: React.FC = () => {
         currentKey={apiKey}
       />
 
-      {/* Cute Footer */}
       <footer className="mt-auto bg-white border-t-4 border-kid-green py-10 relative">
         <div className="max-w-7xl mx-auto px-4 text-center relative z-10">
           <div className="inline-flex items-center justify-center p-3 bg-kid-green/10 rounded-full mb-4">
              <Heart className="w-6 h-6 text-kid-greenDark fill-current animate-pulse" />
           </div>
           <p className="font-black text-slate-800 text-xl mb-3 tracking-tight">Trung tâm Tin học ứng dụng Bal Digitech</p>
-          
           <div className="flex flex-wrap justify-center gap-4 text-slate-600 text-sm font-medium mb-6">
             <span className="bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">🎓 Đào tạo AI & E-learning</span>
             <span className="bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">🎨 Canva & Công cụ giáo viên</span>
             <span className="bg-slate-50 px-3 py-1 rounded-lg border border-slate-100">☎️ 0972.300.864 (Thầy Giới)</span>
           </div>
-
           <div className="text-slate-400 text-xs font-bold border-t border-slate-100 pt-6 max-w-lg mx-auto">
             <p>Phát triển với ❤️ bởi Thầy Giới</p>
             <p className="mt-1 font-normal opacity-70">Powered by Google Gemini 2.5</p>

@@ -1,12 +1,14 @@
+
 import React, { useState, useRef } from 'react';
-import { Sparkles, Loader2, Target, PenTool, BarChart3, Volume2, FileText, X, Upload } from 'lucide-react';
-import { PromptInputProps } from '../types';
+import { Sparkles, Loader2, Target, PenTool, BarChart3, Volume2, FileText, X, Upload, Music, CheckCircle2, AlertCircle } from 'lucide-react';
+import { PromptInputProps, CustomAudioAssets } from '../types';
 import { extractTextFromPDF } from '../services/pdfService';
 
 export const PromptInput: React.FC<PromptInputProps> = ({ onGenerate, isGenerating }) => {
   const [idea, setIdea] = useState('');
   const [ageGroup, setAgeGroup] = useState('Tiểu học (6-10 tuổi)');
   const [difficulty, setDifficulty] = useState('Vừa');
+  const [showAudioUpload, setShowAudioUpload] = useState(false);
   
   // PDF State
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -14,23 +16,25 @@ export const PromptInput: React.FC<PromptInputProps> = ({ onGenerate, isGenerati
   const [isReadingPdf, setIsReadingPdf] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Audio State
+  const [customAudio, setCustomAudio] = useState<CustomAudioAssets>({});
+  const [audioFileNames, setAudioFileNames] = useState({ bg: '', correct: '', wrong: '' });
+
   const difficultyLevels = [
     { value: 'Dễ', color: 'bg-kid-green', border: 'border-kid-greenDark', shadow: 'shadow-kid-greenDark' },
     { value: 'Vừa', color: 'bg-kid-yellow', border: 'border-kid-yellowDark', shadow: 'shadow-kid-yellowDark' },
     { value: 'Khó', color: 'bg-kid-pink', border: 'border-kid-pinkDark', shadow: 'shadow-kid-pinkDark' },
   ];
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePdfChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.type !== 'application/pdf') {
         alert('Vui lòng chỉ chọn file PDF!');
         return;
       }
-      
       setPdfFile(file);
       setIsReadingPdf(true);
-      
       try {
         const text = await extractTextFromPDF(file);
         setPdfContent(text);
@@ -47,26 +51,49 @@ export const PromptInput: React.FC<PromptInputProps> = ({ onGenerate, isGenerati
   const removePdf = () => {
     setPdfFile(null);
     setPdfContent('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Helper convert File to Base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'bg' | 'correct' | 'wrong') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Giới hạn 3MB để tránh crash trình duyệt
+    if (file.size > 3 * 1024 * 1024) {
+        alert("File âm thanh quá lớn! Vui lòng chọn file dưới 3MB.");
+        return;
+    }
+
+    try {
+        const base64 = await fileToBase64(file);
+        setCustomAudio(prev => ({ ...prev, [type === 'bg' ? 'bgMusic' : type === 'correct' ? 'correctSound' : 'wrongSound']: base64 }));
+        setAudioFileNames(prev => ({ ...prev, [type]: file.name }));
+    } catch (error) {
+        alert("Lỗi khi đọc file âm thanh.");
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (idea.trim() || pdfContent) {
-      // Gộp nội dung PDF vào Prompt nếu có
       let finalIdea = idea;
       if (pdfContent) {
         finalIdea += `\n\n[DỮ LIỆU CÂU HỎI TỪ FILE PDF NGƯỜI DÙNG]:\n${pdfContent}\n\n[YÊU CẦU]: Hãy sử dụng dữ liệu câu hỏi trong file PDF trên để tạo nội dung trò chơi.`;
       }
-      
-      // Nếu người dùng không nhập ý tưởng nhưng có file PDF, tự động điền ý tưởng mặc định
       if (!finalIdea.trim() && pdfContent) {
           finalIdea = "Tạo một trò chơi trắc nghiệm dựa trên nội dung file PDF đính kèm.";
       }
-
-      onGenerate(finalIdea, ageGroup, difficulty);
+      onGenerate(finalIdea, ageGroup, difficulty, customAudio);
     }
   };
 
@@ -136,16 +163,9 @@ export const PromptInput: React.FC<PromptInputProps> = ({ onGenerate, isGenerati
         />
       </div>
 
-      {/* PDF Upload Section */}
+      {/* PDF Upload */}
       <div className="space-y-2">
-        <input 
-            type="file" 
-            ref={fileInputRef}
-            accept=".pdf" 
-            onChange={handleFileChange}
-            className="hidden" 
-        />
-        
+        <input type="file" ref={fileInputRef} accept=".pdf" onChange={handlePdfChange} className="hidden" />
         {!pdfFile ? (
             <button
                 type="button"
@@ -161,34 +181,75 @@ export const PromptInput: React.FC<PromptInputProps> = ({ onGenerate, isGenerati
             <div className="w-full py-3 px-4 bg-orange-100 border-2 border-orange-300 rounded-2xl flex items-center justify-between animate-in fade-in zoom-in-95">
                 <div className="flex items-center gap-3 overflow-hidden">
                     <div className="bg-white p-2 rounded-xl shadow-sm">
-                        {isReadingPdf ? (
-                            <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
-                        ) : (
-                            <FileText className="w-5 h-5 text-orange-600" />
-                        )}
+                        {isReadingPdf ? <Loader2 className="w-5 h-5 text-orange-500 animate-spin" /> : <FileText className="w-5 h-5 text-orange-600" />}
                     </div>
                     <div className="flex flex-col min-w-0">
                         <span className="text-sm font-bold text-slate-700 truncate">{pdfFile.name}</span>
-                        <span className="text-xs text-orange-600 font-medium">
-                            {isReadingPdf ? 'Đang đọc nội dung...' : 'Đã sẵn sàng!'}
-                        </span>
+                        <span className="text-xs text-orange-600 font-medium">{isReadingPdf ? 'Đang đọc...' : 'Đã sẵn sàng!'}</span>
                     </div>
                 </div>
-                <button 
-                    type="button"
-                    onClick={removePdf}
-                    className="p-1.5 hover:bg-white/50 rounded-full text-slate-500 hover:text-red-500 transition-colors"
-                >
+                <button type="button" onClick={removePdf} className="p-1.5 hover:bg-white/50 rounded-full text-slate-500 hover:text-red-500 transition-colors">
                     <X className="w-5 h-5" />
                 </button>
             </div>
         )}
       </div>
 
-      {/* Audio Indicator */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-500 border border-slate-200">
-          <Volume2 className="w-4 h-4 text-kid-green" />
-          <span>Hệ thống đã tự động tích hợp Âm thanh & Nhạc nền</span>
+      {/* Custom Audio Section */}
+      <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl overflow-hidden">
+        <button 
+            type="button"
+            onClick={() => setShowAudioUpload(!showAudioUpload)}
+            className="w-full px-4 py-3 flex items-center justify-between text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+        >
+            <div className="flex items-center gap-2">
+                <Music className="w-4 h-4 text-kid-blue" />
+                Tự tải lên Âm thanh (Tùy chọn)
+            </div>
+            <span className="text-xs bg-slate-200 px-2 py-0.5 rounded text-slate-500">{showAudioUpload ? 'Thu gọn' : 'Mở rộng'}</span>
+        </button>
+        
+        {showAudioUpload && (
+            <div className="p-4 space-y-3 bg-white border-t border-slate-200 animate-in slide-in-from-top-2">
+                <div className="text-xs text-slate-400 mb-2 italic">Hỗ trợ file MP3/WAV (Max 3MB). File sẽ được nhúng thẳng vào game để chạy offline.</div>
+                
+                {/* BG Music Upload */}
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0"><Volume2 className="w-4 h-4 text-blue-500" /></div>
+                    <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold text-slate-700 mb-1">Nhạc nền</div>
+                        <input type="file" accept="audio/*" onChange={(e) => handleAudioUpload(e, 'bg')} className="hidden" id="bg-upload" />
+                        <label htmlFor="bg-upload" className="block w-full text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded px-2 py-1.5 cursor-pointer hover:bg-slate-100 truncate">
+                            {audioFileNames.bg || "Chọn file..."}
+                        </label>
+                    </div>
+                </div>
+
+                {/* Correct Sound Upload */}
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0"><CheckCircle2 className="w-4 h-4 text-green-500" /></div>
+                    <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold text-slate-700 mb-1">Âm thanh Đúng</div>
+                        <input type="file" accept="audio/*" onChange={(e) => handleAudioUpload(e, 'correct')} className="hidden" id="correct-upload" />
+                        <label htmlFor="correct-upload" className="block w-full text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded px-2 py-1.5 cursor-pointer hover:bg-slate-100 truncate">
+                             {audioFileNames.correct || "Chọn file..."}
+                        </label>
+                    </div>
+                </div>
+
+                {/* Wrong Sound Upload */}
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0"><AlertCircle className="w-4 h-4 text-red-500" /></div>
+                    <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold text-slate-700 mb-1">Âm thanh Sai</div>
+                        <input type="file" accept="audio/*" onChange={(e) => handleAudioUpload(e, 'wrong')} className="hidden" id="wrong-upload" />
+                        <label htmlFor="wrong-upload" className="block w-full text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded px-2 py-1.5 cursor-pointer hover:bg-slate-100 truncate">
+                             {audioFileNames.wrong || "Chọn file..."}
+                        </label>
+                    </div>
+                </div>
+            </div>
+        )}
       </div>
 
       <button

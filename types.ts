@@ -11,8 +11,14 @@ export interface PendingGameRequest {
   difficulty: string;
 }
 
+export interface CustomAudioAssets {
+  bgMusic?: string; // Base64 string
+  correctSound?: string; // Base64 string
+  wrongSound?: string; // Base64 string
+}
+
 export interface PromptInputProps {
-  onGenerate: (idea: string, ageGroup: string, difficulty: string) => void;
+  onGenerate: (idea: string, ageGroup: string, difficulty: string, customAudio: CustomAudioAssets) => void;
   isGenerating: boolean;
 }
 
