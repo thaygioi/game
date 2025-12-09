@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Gamepad2, Wand2, Rocket, Star, Heart, Settings, Users } from 'lucide-react';
+import { Gamepad2, Wand2, Rocket, Star, Heart, Settings, Users, Globe } from 'lucide-react';
 import { PromptInput } from './components/PromptInput';
 import { GameDisplay } from './components/GameDisplay';
 import { ChatBot } from './components/ChatBot';
@@ -23,9 +23,23 @@ const App: React.FC = () => {
   const [proactiveMessage, setProactiveMessage] = useState<string | null>(null);
   const [pendingRequest, setPendingRequest] = useState<PendingGameRequest & { customAudio: CustomAudioAssets } | null>(null);
 
+  // Online Users Simulation
+  const [onlineUsers, setOnlineUsers] = useState(() => Math.floor(Math.random() * (280 - 140) + 140));
+
   useEffect(() => {
     const savedKey = localStorage.getItem('GEMINI_API_KEY');
     if (savedKey) setApiKey(savedKey);
+
+    // Simulate fluctuation in online users
+    const interval = setInterval(() => {
+        setOnlineUsers(prev => {
+            const change = Math.floor(Math.random() * 7) - 3; // Randomly add/remove -3 to +3 users
+            const newValue = prev + change;
+            return newValue < 100 ? 100 : newValue; // Keep realistic minimum
+        });
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleSaveApiKey = (key: string) => {
@@ -130,6 +144,17 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2">
+             {/* Online Users Counter */}
+             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-green-50/80 backdrop-blur-sm border border-green-200 rounded-full text-xs font-bold text-green-700 mr-2 shadow-sm animate-in fade-in zoom-in">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                </span>
+                <span className="tabular-nums">{onlineUsers}</span>
+                <span className="hidden xl:inline">đang tạo game</span>
+                <span className="xl:hidden">online</span>
+             </div>
+
              <a
                 href="https://zalo.me/g/zickyw266"
                 target="_blank"

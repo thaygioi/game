@@ -28,7 +28,7 @@ export const ChatBot: React.FC<ChatBotProps> = ({
     {
       id: 'welcome',
       role: 'model',
-      text: 'Xin chào! Tôi là trợ lý AI. Tôi có thể giúp bạn chỉnh sửa trò chơi, thay đổi màu sắc hoặc giải thích code.'
+      text: 'Xin chào thầy cô! tôi là trợ lí của thầy Giới sẽ giúp thầy cô chỉnh sửa lại game cho phù hợp nhé! Bất kỳ yêu cầu nào tôi cũng có thể giúp thầy cô! Trân trọng! he he!'
     }
   ]);
   const [input, setInput] = useState('');
