@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Gamepad2, Wand2, Rocket, Star, Heart, Settings, Users, Globe } from 'lucide-react';
+import { Gamepad2, Wand2, Rocket, Star, Heart, Settings, Users, Megaphone } from 'lucide-react';
 import { PromptInput } from './components/PromptInput';
 import { GameDisplay } from './components/GameDisplay';
 import { ChatBot } from './components/ChatBot';
@@ -26,6 +26,9 @@ const App: React.FC = () => {
   // Online Users Simulation
   const [onlineUsers, setOnlineUsers] = useState(() => Math.floor(Math.random() * (280 - 140) + 140));
 
+  // Notification Banner
+  const [notification, setNotification] = useState<string>('');
+
   useEffect(() => {
     const savedKey = localStorage.getItem('GEMINI_API_KEY');
     if (savedKey) setApiKey(savedKey);
@@ -38,6 +41,22 @@ const App: React.FC = () => {
             return newValue < 100 ? 100 : newValue; // Keep realistic minimum
         });
     }, 5000);
+
+    // Fetch Notification from Google Sheets CSV
+    const fetchNotification = async () => {
+        try {
+            const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-EAyrpei9lYHAfvWggCABcuc40pG7BRwXvr0yvBWGLDtcXH-vogJrwFAxk9uPRbx8BvUxsEijGRLa/pub?gid=436682251&single=true&output=csv');
+            if (response.ok) {
+                const text = await response.text();
+                // Clean CSV data (remove quotes if present)
+                const cleanText = text.replace(/^"|"$/g, '').trim();
+                if (cleanText) setNotification(cleanText);
+            }
+        } catch (error) {
+            console.error("Failed to fetch notification:", error);
+        }
+    };
+    fetchNotification();
 
     return () => clearInterval(interval);
   }, []);
@@ -126,6 +145,20 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-polka flex flex-col relative font-sans text-slate-700">
+      
+      {/* Notification Banner */}
+      {notification && (
+        <div className="bg-gradient-to-r from-orange-400 to-red-500 text-white text-sm font-bold py-2 overflow-hidden relative shadow-sm z-30">
+            <div className="flex items-center absolute left-0 top-0 bottom-0 px-3 bg-red-600 z-10 shadow-md">
+                <Megaphone className="w-4 h-4 mr-2 animate-bounce" />
+                <span className="uppercase tracking-wider text-xs">Thông báo</span>
+            </div>
+            <div className="animate-marquee whitespace-nowrap pl-24">
+                {notification}
+            </div>
+        </div>
+      )}
+
       {/* Colorful Header */}
       <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b-4 border-kid-blue shadow-sm">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
@@ -145,14 +178,14 @@ const App: React.FC = () => {
           
           <div className="flex items-center gap-2">
              {/* Online Users Counter */}
-             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-green-50/80 backdrop-blur-sm border border-green-200 rounded-full text-xs font-bold text-green-700 mr-2 shadow-sm animate-in fade-in zoom-in">
-                <span className="relative flex h-2.5 w-2.5">
+             <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-green-50/80 backdrop-blur-sm border border-green-200 rounded-full text-xs font-bold text-green-700 mr-1 sm:mr-2 shadow-sm animate-in fade-in zoom-in">
+                <span className="relative flex h-2 sm:h-2.5 w-2 sm:w-2.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                  <span className="relative inline-flex rounded-full h-2 sm:h-2.5 w-2 sm:w-2.5 bg-green-500"></span>
                 </span>
                 <span className="tabular-nums">{onlineUsers}</span>
                 <span className="hidden xl:inline">đang tạo game</span>
-                <span className="xl:hidden">online</span>
+                <span className="hidden sm:inline xl:hidden">online</span>
              </div>
 
              <a
