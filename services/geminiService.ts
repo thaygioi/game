@@ -3,7 +3,10 @@ import { GoogleGenAI } from "@google/genai";
 import { ChatMessage, CustomAudioAssets } from "../types";
 
 const getClient = (userApiKey?: string) => {
-    let rawKey = userApiKey || process.env.API_KEY;
+    // Safety check for process.env in browser environment
+    const envKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : '';
+    let rawKey = userApiKey || envKey;
+    
     if (!rawKey) throw new Error("Chưa có API Key! Vui lòng nhấn vào nút Cài đặt (⚙️) ở góc trên màn hình để nhập Google Gemini API Key.");
     let finalKey = rawKey;
     try {

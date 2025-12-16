@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <script>
-      // Polyfill for Promise.withResolvers (Required for PDF.js v4+)
+      // 1. Polyfill for Promise.withResolvers (Required for PDF.js v4+)
       if (typeof Promise.withResolvers === 'undefined') {
         Promise.withResolvers = function () {
           let resolve, reject;
@@ -18,6 +18,14 @@
           return { promise, resolve, reject };
         };
       }
+
+      // 2. Polyfill for process (Required for Vercel/Browser runtime to avoid 'process is not defined')
+      window.process = {
+        env: {
+          NODE_ENV: 'production',
+          API_KEY: '' // Placeholder to prevent crash
+        }
+      };
 
       tailwind.config = {
         theme: {
@@ -110,7 +118,9 @@
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
     "pdfjs-dist/build/pdf": "https://aistudiocdn.com/pdfjs-dist@4.0.379/build/pdf.mjs",
     "pdfjs-dist/build/pdf.worker": "https://aistudiocdn.com/pdfjs-dist@4.0.379/build/pdf.worker.mjs",
-    "pdfjs-dist/": "https://aistudiocdn.com/pdfjs-dist@4.0.379/"
+    "pdfjs-dist/": "https://aistudiocdn.com/pdfjs-dist@4.0.379/",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "vite": "https://esm.sh/vite@^7.3.0"
   }
 }
 </script>
@@ -118,6 +128,8 @@
 </head>
   <body>
     <div id="root"></div>
+    <!-- Entry Point Script for Vite/Vercel -->
+    <script type="module" src="./index.tsx"></script>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>

@@ -1,9 +1,16 @@
 
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/build/pdf';
+// @ts-ignore
+import * as pdfjsLib from 'pdfjs-dist/build/pdf';
+
+// Lấy object từ import (xử lý sự khác biệt giữa ESM và CommonJS khi build)
+const getDocument = pdfjsLib.getDocument;
+const GlobalWorkerOptions = pdfjsLib.GlobalWorkerOptions;
 
 // Cấu hình Worker cho PDF.js
 // Lưu ý: Phải khớp phiên bản với import map trong index.html
-GlobalWorkerOptions.workerSrc = 'https://aistudiocdn.com/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
+if (GlobalWorkerOptions) {
+    GlobalWorkerOptions.workerSrc = 'https://aistudiocdn.com/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
+}
 
 export const extractTextFromPDF = async (file: File): Promise<string> => {
   try {
