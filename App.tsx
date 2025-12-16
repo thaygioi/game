@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Gamepad2, Wand2, Rocket, Star, Heart, Settings, Users, Megaphone } from 'lucide-react';
+import { Gamepad2, Wand2, Rocket, Star, Heart, Settings, Users, Megaphone, BookOpen } from 'lucide-react';
 import { PromptInput } from './components/PromptInput';
 import { GameDisplay } from './components/GameDisplay';
 import { ChatBot } from './components/ChatBot';
 import { SettingsModal } from './components/SettingsModal';
+import { HelpModal } from './components/HelpModal';
 import { generateGameCodeStream, consultGameLogic } from './services/geminiService';
 import { GameGenerationState, PendingGameRequest, CustomAudioAssets } from './types';
 
@@ -18,6 +19,7 @@ const App: React.FC = () => {
   // API Key Management
   const [apiKey, setApiKey] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   
   // Logic Consultation
   const [proactiveMessage, setProactiveMessage] = useState<string | null>(null);
@@ -188,24 +190,26 @@ const App: React.FC = () => {
                 <span className="hidden sm:inline xl:hidden">online</span>
              </div>
 
+             {/* Help Button */}
+             <button
+                onClick={() => setIsHelpOpen(true)}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 border-b-4 border-orange-700 active:border-b-0 active:translate-y-1"
+                title="Hướng dẫn sử dụng"
+             >
+                <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Hướng dẫn</span>
+             </button>
+
              <a
                 href="https://zalo.me/g/zickyw266"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 sm:px-5 py-2 bg-[#0068FF] hover:bg-[#0054cc] text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 mr-1 border-b-4 border-[#0041a3] active:border-b-0 active:translate-y-1"
+                className="hidden md:flex items-center gap-2 px-3 sm:px-5 py-2 bg-[#0068FF] hover:bg-[#0054cc] text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 mr-1 border-b-4 border-[#0041a3] active:border-b-0 active:translate-y-1"
                 title="Tham gia nhóm Zalo"
              >
                 <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">Cộng đồng & Hướng dẫn</span>
-                <span className="sm:hidden">Cộng đồng</span>
+                <span className="hidden sm:inline">Cộng đồng</span>
              </a>
-
-             <div className="hidden lg:flex px-4 py-2 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold border-2 border-yellow-200 shadow-sm items-center gap-1">
-                <Star className="w-3 h-3 fill-current" /> Thầy Giới
-             </div>
-             <div className="hidden xl:flex px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-xs font-bold border-2 border-purple-200 shadow-sm items-center gap-1">
-                <Rocket className="w-3 h-3 fill-current" /> Bal Digitech
-             </div>
              
              <button 
                 onClick={() => setIsSettingsOpen(true)}
@@ -264,6 +268,11 @@ const App: React.FC = () => {
         onClose={() => setIsSettingsOpen(false)}
         onSave={handleSaveApiKey}
         currentKey={apiKey}
+      />
+
+      <HelpModal 
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
       />
 
       <footer className="mt-auto bg-white border-t-4 border-kid-green py-10 relative">

@@ -1,14 +1,16 @@
-import * as pdfjsLib from 'pdfjs-dist/build/pdf';
+
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/build/pdf';
 
 // Cấu hình Worker cho PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://aistudiocdn.com/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
+// Lưu ý: Phải khớp phiên bản với import map trong index.html
+GlobalWorkerOptions.workerSrc = 'https://aistudiocdn.com/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
 
 export const extractTextFromPDF = async (file: File): Promise<string> => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     
     // Tải tài liệu PDF
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const loadingTask = getDocument({ data: arrayBuffer });
     const pdf = await loadingTask.promise;
     
     let fullText = '';
@@ -27,9 +29,17 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
       fullText += `--- TRANG ${pageNum} ---\n${pageText}\n\n`;
     }
 
+    if (!fullText.trim()) {
+        return "Không tìm thấy văn bản nào trong PDF (Có thể là PDF dạng ảnh scan).";
+    }
+
     return fullText;
   } catch (error) {
     console.error("Lỗi khi đọc file PDF:", error);
-    throw new Error("Không thể đọc file PDF. Vui lòng đảm bảo file không bị hỏng hoặc có mật khẩu.");
+    let errorMsg = "Không thể đọc file PDF.";
+    if (error instanceof Error) {
+        errorMsg += " Chi tiết: " + error.message;
+    }
+    throw new Error(errorMsg);
   }
 };
